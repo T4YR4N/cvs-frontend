@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  frontend-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file: .env.local
+    volumes:
+      - "./src:/app/src"
+volumes:
+  pgdata:

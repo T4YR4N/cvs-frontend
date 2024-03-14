@@ -1,0 +1,18 @@
+.table {
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.table td {
+  border: 1px solid;
+}
+
+.clickableTable {
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.clickableTable td {
+  border: 1px solid;
+  cursor: pointer;
+}
