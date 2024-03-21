@@ -37,6 +37,14 @@ const View = ({ params }: { params: { scanId: string } }) => {
     removals: [],
     changes: [],
   });
+  const [selectedScan, setSelectedScan] = useState<Scan | undefined>(undefined);
+  const [selectedScanMatch, setSelectedScanMatch] = useState<
+    | {
+        currentMatch: GrypeResult["matches"][number];
+        selectedMatch: GrypeResult["matches"][number];
+      }
+    | undefined
+  >(undefined);
 
   const sortJsonByHash = (a: SafeNonPrimitive, b: SafeNonPrimitive) => {
     const aHash = sha256(JSON.stringify(a)).toString();
@@ -85,6 +93,7 @@ const View = ({ params }: { params: { scanId: string } }) => {
   ) => {
     if (!scanId) {
       setDiff({ additions: [], removals: [], changes: [] });
+      setSelectedScan(undefined);
       return;
     }
 
@@ -94,6 +103,8 @@ const View = ({ params }: { params: { scanId: string } }) => {
       getSelectedScanRes.responseObject?.result?.matches || [];
 
     if (!getSelectedScanRes.success || !selectedScanMatches.length) return;
+
+    setSelectedScan(getSelectedScanRes.responseObject);
 
     const currentMatchesReduced = reducedResult(currentMatches);
     const otherScanMatchesReduced = reducedResult(selectedScanMatches);
@@ -230,75 +241,244 @@ const View = ({ params }: { params: { scanId: string } }) => {
     return styles.standard;
   };
 
+  const selectOldAndNewMatches = (
+    cve: string,
+    pkg: string,
+    version: string
+  ) => {
+    const currentMatch = scan?.result?.matches.find(
+      (val) =>
+        val.vulnerability.id.toLowerCase().trim() ===
+          cve.toLowerCase().trim() &&
+        val.artifact.name.toLowerCase().trim() === pkg.toLowerCase().trim() &&
+        val.artifact.version.toLowerCase().trim() ===
+          version.toLowerCase().trim()
+    );
+
+    const selectedMatch = selectedScan?.result?.matches.find(
+      (val) =>
+        val.vulnerability.id.toLowerCase().trim() ===
+          cve.toLowerCase().trim() &&
+        val.artifact.name.toLowerCase().trim() === pkg.toLowerCase().trim() &&
+        val.artifact.version.toLowerCase().trim() ===
+          version.toLowerCase().trim()
+    );
+
+    if (currentMatch === undefined || selectedMatch === undefined) {
+      setSelectedScanMatch(undefined);
+      return;
+    }
+
+    const currentReducedMatch = reducedResult([currentMatch])[0];
+    const selectedReducedMatch = reducedResult([selectedMatch])[0];
+
+    setSelectedScanMatch({
+      selectedMatch: selectedReducedMatch,
+      currentMatch: currentReducedMatch,
+    });
+  };
+
   return (
-    <div>
-      {sbom && scan ? (
-        <React.Fragment>
-          <h1>{params.scanId}</h1>
-          <p>
-            Scan der Sbom {sbom?.prettyName} vom {formatDate(scan?.createdAt)}
-          </p>
-          <span>Vegleichen mit:</span>
-          <select
-            onChange={(e) =>
-              calcDiff(e.target.value, scan.result?.matches || [])
-            }
-          >
-            {scanOptions}
-          </select>
-          <br />
-          <p>Additions seit dem ausgewählten Datum: {diff.additions.length}</p>
-          <p>Deletions seit dem ausgewählten Datum: {diff.removals.length}</p>
-          <p>Changes seit dem ausgewählten Datum: {diff.changes.length}</p>
-          <table className={mainStyles.table}>
-            <thead>
-              <tr>
-                <th>Paket</th>
-                <th>Version</th>
-                <th>CVE</th>
-                <th>Match-Typ</th>
-                <th>Severity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {diff.removals.map((val) => {
-                return (
-                  <tr
-                    key={`${val.cve}/${val.name}/${val.version}`}
-                    className={styles.red}
-                  >
-                    <td>{val.name}</td>
-                    <td>{val.version}</td>
-                    <td>{val.cve.toUpperCase()}</td>
-                    <td>{val.type}</td>
-                    <td>{val.severity}</td>
+    <div style={{ display: "grid", gridTemplateColumns: "70% 30%" }}>
+      <div>
+        {sbom && scan ? (
+          <React.Fragment>
+            <div style={{ width: "100%", height: "30vh" }}>
+              <h1>{params.scanId}</h1>
+              <p>
+                Scan der Sbom {sbom?.prettyName} vom{" "}
+                {formatDate(scan?.createdAt)}
+              </p>
+              <span>Vegleichen mit:</span>
+              <select
+                onChange={(e) =>
+                  calcDiff(e.target.value, scan.result?.matches || [])
+                }
+              >
+                {scanOptions}
+              </select>
+              <br />
+              <p>
+                Additions seit dem ausgewählten Datum: {diff.additions.length}
+              </p>
+              <p>
+                Deletions seit dem ausgewählten Datum: {diff.removals.length}
+              </p>
+              <p>Changes seit dem ausgewählten Datum: {diff.changes.length}</p>
+            </div>
+            <div style={{ width: "100%", overflowY: "scroll", height: "70vh" }}>
+              <table className={mainStyles.table}>
+                <thead>
+                  <tr>
+                    <th>Paket</th>
+                    <th>Version</th>
+                    <th>CVE</th>
+                    <th>Match-Typ</th>
+                    <th>Severity</th>
                   </tr>
-                );
-              })}
-              {scan?.result?.matches.map((scan) => {
-                return (
-                  <tr
-                    key={`${scan.vulnerability.id}/${scan.artifact.name}/${scan.artifact.version}`}
-                    className={mapAddOrChangeToClassName(
-                      scan.vulnerability.id.trim().toLowerCase(),
-                      scan.artifact.name.trim().toLowerCase(),
-                      scan.artifact.version.trim().toLowerCase()
+                </thead>
+                <tbody>
+                  {diff.removals.map((val) => {
+                    return (
+                      <tr
+                        key={`${val.cve}/${val.name}/${val.version}`}
+                        className={styles.red}
+                        onClick={() => setSelectedScanMatch(undefined)}
+                      >
+                        <td>{val.name}</td>
+                        <td>{val.version}</td>
+                        <td>{val.cve.toUpperCase()}</td>
+                        <td>{val.type}</td>
+                        <td>{val.severity}</td>
+                      </tr>
+                    );
+                  })}
+                  {scan?.result?.matches.map((scan) => {
+                    return (
+                      <tr
+                        key={`${scan.vulnerability.id}/${scan.artifact.name}/${scan.artifact.version}`}
+                        className={mapAddOrChangeToClassName(
+                          scan.vulnerability.id.trim().toLowerCase(),
+                          scan.artifact.name.trim().toLowerCase(),
+                          scan.artifact.version.trim().toLowerCase()
+                        )}
+                        onClick={() =>
+                          selectOldAndNewMatches(
+                            scan.vulnerability.id,
+                            scan.artifact.name,
+                            scan.artifact.version
+                          )
+                        }
+                      >
+                        <td>{scan.artifact.name}</td>
+                        <td>{scan.artifact.version}</td>
+                        <td>{scan.vulnerability.id}</td>
+                        <td>{scan.matchDetails[0].type}</td>
+                        <td>{scan.vulnerability.severity}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </React.Fragment>
+        ) : (
+          <p>Loading...</p>
+        )}
+      </div>
+      <div style={{ width: "100%" }}>
+        <table>
+          <thead>
+            <tr>
+              <th>Attribut</th>
+              <th>Vegleich</th>
+              <th>Aktuell</th>
+            </tr>
+          </thead>
+          <tbody>
+            {selectedScanMatch && (
+              <React.Fragment>
+                <tr>
+                  <td>
+                    <b>Vulnerability ID</b>
+                  </td>
+                  <td>{selectedScanMatch.selectedMatch.vulnerability.id}</td>
+                  <td>{selectedScanMatch.currentMatch.vulnerability.id}</td>
+                </tr>
+                <tr>
+                  <td>
+                    <b>Severity</b>
+                  </td>
+                  <td>
+                    {selectedScanMatch.selectedMatch.vulnerability.severity}
+                  </td>
+                  <td>
+                    {selectedScanMatch.currentMatch.vulnerability.severity}
+                  </td>
+                </tr>
+                {selectedScanMatch.selectedMatch.vulnerability.cvss.map(
+                  ({ metrics }, index) => {
+                    const {
+                      baseScore: currentBaseScore,
+                      exploitabilityScore: currentExpliotabilityScore,
+                      impactScore: currentImpactScore,
+                    } = selectedScanMatch.currentMatch.vulnerability.cvss[index]
+                      .metrics;
+
+                    return (
+                      <React.Fragment key={`cvss${index}`}>
+                        <tr>
+                          <td>
+                            <b>CVSS {index + 1}</b>
+                          </td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                        <tr>
+                          <td>Base Score</td>
+                          <td>{metrics.baseScore}</td>
+                          <td>{currentBaseScore}</td>
+                        </tr>
+                        <tr>
+                          <td>Exploitability Score</td>
+                          <td>{metrics.exploitabilityScore}</td>
+                          <td>{currentExpliotabilityScore}</td>
+                        </tr>
+                        <tr>
+                          <td>Impact Score</td>
+                          <td>{metrics.impactScore}</td>
+                          <td>{currentImpactScore}</td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  }
+                )}
+                <tr>
+                  <td>
+                    <b>Fix Versionen</b>
+                  </td>
+                  <td>
+                    {selectedScanMatch.selectedMatch.vulnerability.fix.versions.join(
+                      ","
                     )}
-                  >
-                    <td>{scan.artifact.name}</td>
-                    <td>{scan.artifact.version}</td>
-                    <td>{scan.vulnerability.id}</td>
-                    <td>{scan.matchDetails[0].type}</td>
-                    <td>{scan.vulnerability.severity}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </React.Fragment>
-      ) : (
-        <p>Loading...</p>
-      )}
+                  </td>
+                  <td>
+                    {selectedScanMatch.currentMatch.vulnerability.fix.versions.join(
+                      ","
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <b>Fix Status</b>
+                  </td>
+                  <td>
+                    {selectedScanMatch.selectedMatch.vulnerability.fix.state}
+                  </td>
+                  <td>
+                    {selectedScanMatch.currentMatch.vulnerability.fix.state}
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <b>Match Details</b>
+                  </td>
+                  <td>
+                    {selectedScanMatch.selectedMatch.matchDetails
+                      .map(({ type }) => type)
+                      .join(",")}
+                  </td>
+                  <td>
+                    {selectedScanMatch.currentMatch.matchDetails
+                      .map(({ type }) => type)
+                      .join(",")}
+                  </td>
+                </tr>
+              </React.Fragment>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
