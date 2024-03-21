@@ -283,7 +283,7 @@ const View = ({ params }: { params: { scanId: string } }) => {
       <div>
         {sbom && scan ? (
           <React.Fragment>
-            <div style={{ width: "100%", height: "30vh" }}>
+            <div style={{ width: "100%", height: "25vh" }}>
               <h1>{params.scanId}</h1>
               <p>
                 Scan der Sbom {sbom?.prettyName} vom{" "}
