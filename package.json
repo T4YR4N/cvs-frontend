@@ -2,6 +2,7 @@
   "name": "cvs-frontend",
   "version": "0.1.0",
   "private": true,
+  "description": "A frontend for https://github.com/T4YR4N/continuousVulnScan",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
